@@ -1,74 +1,187 @@
-import { Image, StyleSheet, Platform } from 'react-native';
+import React, { useState } from "react";
+import { Dimensions, StyleSheet, SafeAreaView, View } from "react-native";
 
-import { HelloWave } from '@/components/HelloWave';
-import ParallaxScrollView from '@/components/ParallaxScrollView';
-import { ThemedText } from '@/components/ThemedText';
-import { ThemedView } from '@/components/ThemedView';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+} from "react-native-reanimated";
+import {
+  Gesture,
+  GestureDetector,
+  GestureHandlerRootView,
+  TouchableWithoutFeedback,
+} from "react-native-gesture-handler";
+import ShapeContainer from "../components/ShapeContainer";
+import Button from "../components/Button";
+import GridCanvas from "../screens/GridCanvas";
 
-export default function HomeScreen() {
+const { width, height } = Dimensions.get("screen");
+
+function clamp(val: any, min: any, max: any) {
+  return Math.min(Math.max(val, min), max);
+}
+
+export default function App() {
+  const translationX = useSharedValue(0);
+  const translationY = useSharedValue(0);
+  const prevTranslationX = useSharedValue(0);
+  const prevTranslationY = useSharedValue(0);
+
+  const scale = useSharedValue(1);
+  const startScale = useSharedValue(1);
+  const [resizable, setResizable] = useState(false);
+  const [selectedShape, setSelectedShape] = useState<string | null>(null);
+  const [shapeContainerVisible, setShapeContainerVisible] = useState(false);
+  const [selectedShapeContainer, setSelectedShapeContainer] = useState<any[]>(
+    []
+  );
+
+  const animatedStyles = useAnimatedStyle(() => ({
+    transform: [
+      { translateX: translationX.value },
+      { translateY: translationY.value },
+      { scale: scale.value },
+    ],
+  }));
+
+  const pan = Gesture.Pan()
+    .minDistance(1)
+    .onStart(() => {
+      prevTranslationX.value = translationX.value;
+      prevTranslationY.value = translationY.value;
+    })
+    .onUpdate((event) => {
+      const maxTranslateX = width / 2 - 50;
+      const maxTranslateY = height / 2 - 50;
+
+      translationX.value = clamp(
+        prevTranslationX.value + event.translationX,
+        -maxTranslateX,
+        maxTranslateX
+      );
+      translationY.value = clamp(
+        prevTranslationY.value + event.translationY,
+        -maxTranslateY,
+        maxTranslateY
+      );
+    })
+    .runOnJS(true);
+
+  const pinch = Gesture.Pinch()
+    .onStart(() => {
+      startScale.value = scale.value;
+    })
+    .onUpdate((event) => {
+      scale.value = clamp(
+        startScale.value * event.scale,
+        0.5,
+        Math.min(width / 100, height / 100)
+      );
+    })
+    .runOnJS(true);
+
+  const angle = useSharedValue(0);
+  const startAngle = useSharedValue(0);
+
+  const rotation = Gesture.Rotation()
+    .onStart(() => {
+      startAngle.value = angle.value;
+    })
+    .onUpdate((event) => {
+      angle.value = startAngle.value + event.rotation;
+    });
+
+  const boxAnimatedStyles = useAnimatedStyle(() => ({
+    transform: [{ rotate: `${angle.value}rad` }],
+  }));
+
+  const handleSelectedShape = (shape: string) => {
+    setSelectedShape(shape);
+    setSelectedShapeContainer((prevState) => [...prevState, shape]);
+  };
+
   return (
-    <ParallaxScrollView
-      headerBackgroundColor={{ light: '#A1CEDC', dark: '#1D3D47' }}
-      headerImage={
-        <Image
-          source={require('@/assets/images/partial-react-logo.png')}
-          style={styles.reactLogo}
+    <SafeAreaView style={styles.safeArea}>
+      <GestureHandlerRootView style={styles.container}>
+        <GridCanvas />
+
+        {selectedShapeContainer.map((shape, index) => (
+          <GestureDetector
+            key={index}
+            gesture={Gesture.Simultaneous(!resizable ? pan : pinch, rotation)}
+          >
+            <Animated.View
+              style={[
+                animatedStyles,
+                boxAnimatedStyles,
+                styles[shape as keyof typeof styles],
+                resizable && { borderColor: "blue" },
+              ]}
+            >
+              <TouchableWithoutFeedback></TouchableWithoutFeedback>
+            </Animated.View>
+          </GestureDetector>
+        ))}
+      </GestureHandlerRootView>
+
+      <View style={{ alignItems: "center", justifyContent: "center" }}>
+        <Button
+          title={resizable ? "Move" : "Resize"}
+          onPress={() => setResizable(!resizable)}
+          style={{ fontSize: 20 }}
         />
-      }>
-      <ThemedView style={styles.titleContainer}>
-        <ThemedText type="title">Welcome!</ThemedText>
-        <HelloWave />
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 1: Try it</ThemedText>
-        <ThemedText>
-          Edit <ThemedText type="defaultSemiBold">app/(tabs)/index.tsx</ThemedText> to see changes.
-          Press{' '}
-          <ThemedText type="defaultSemiBold">
-            {Platform.select({
-              ios: 'cmd + d',
-              android: 'cmd + m',
-              web: 'F12'
-            })}
-          </ThemedText>{' '}
-          to open developer tools.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 2: Explore</ThemedText>
-        <ThemedText>
-          Tap the Explore tab to learn more about what's included in this starter app.
-        </ThemedText>
-      </ThemedView>
-      <ThemedView style={styles.stepContainer}>
-        <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
-        <ThemedText>
-          When you're ready, run{' '}
-          <ThemedText type="defaultSemiBold">npm run reset-project</ThemedText> to get a fresh{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> directory. This will move the current{' '}
-          <ThemedText type="defaultSemiBold">app</ThemedText> to{' '}
-          <ThemedText type="defaultSemiBold">app-example</ThemedText>.
-        </ThemedText>
-      </ThemedView>
-    </ParallaxScrollView>
+      </View>
+
+      <View style={styles.ShapeContainer}>
+        {!shapeContainerVisible ? (
+          <Button
+            onPress={() => setShapeContainerVisible(true)}
+            title={"Open Shapes"}
+          />
+        ) : (
+          <ShapeContainer handleSelectedShape={handleSelectedShape} />
+        )}
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
+  safeArea: {
+    justifyContent: "flex-end",
+    flex: 1,
+    backgroundColor: "#fff",
   },
-  stepContainer: {
-    gap: 8,
-    marginBottom: 8,
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
   },
-  reactLogo: {
-    height: 178,
-    width: 290,
-    bottom: 0,
-    left: 0,
-    position: 'absolute',
+  square: {
+    width: 100,
+    height: 100,
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  circle: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  rectangle: {
+    width: 100,
+    height: 50,
+    borderWidth: 2,
+    borderColor: "#000",
+  },
+  ShapeContainer: {
+    marginBottom: 50,
+    backgroundColor: "#EAEAEA",
+    borderWidth: 1,
+    borderColor: "black",
+    flexDirection: "row",
+    justifyContent: "space-evenly",
   },
 });
