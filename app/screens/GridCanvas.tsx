@@ -10,7 +10,6 @@ const GridCanvas = () => {
     const drawGrid = (canvas: any) => {
       if (canvas) {
         const ctx = canvas.getContext("2d");
-
         canvas.width = WIDTH;
         canvas.height = HEIGHT;
 
@@ -41,8 +40,7 @@ const GridCanvas = () => {
     };
 
     if (canvasRef.current) {
-      const canvas = canvasRef.current;
-      drawGrid(canvas);
+      drawGrid(canvasRef.current);
     }
   }, []);
 

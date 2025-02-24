@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { Dimensions, StyleSheet, SafeAreaView, View } from "react-native";
-
 import Animated, {
   useSharedValue,
   useAnimatedStyle,
@@ -9,7 +8,6 @@ import {
   Gesture,
   GestureDetector,
   GestureHandlerRootView,
-  TouchableWithoutFeedback,
 } from "react-native-gesture-handler";
 import ShapeContainer from "../components/ShapeContainer";
 import Button from "../components/Button";
@@ -22,81 +20,99 @@ function clamp(val: any, min: any, max: any) {
 }
 
 export default function App() {
-  const translationX = useSharedValue(0);
-  const translationY = useSharedValue(0);
-  const prevTranslationX = useSharedValue(0);
-  const prevTranslationY = useSharedValue(0);
-
-  const scale = useSharedValue(1);
-  const startScale = useSharedValue(1);
   const [resizable, setResizable] = useState(false);
-  const [selectedShape, setSelectedShape] = useState<string | null>(null);
-  const [shapeContainerVisible, setShapeContainerVisible] = useState(false);
   const [selectedShapeContainer, setSelectedShapeContainer] = useState<any[]>(
     []
   );
+  const [shapeContainerVisible, setShapeContainerVisible] = useState(false);
 
-  const animatedStyles = useAnimatedStyle(() => ({
-    transform: [
-      { translateX: translationX.value },
-      { translateY: translationY.value },
-      { scale: scale.value },
-    ],
-  }));
+  const numShapes = 100;
+  const shapes = [];
 
-  const pan = Gesture.Pan()
-    .minDistance(1)
-    .onStart(() => {
-      prevTranslationX.value = translationX.value;
-      prevTranslationY.value = translationY.value;
-    })
-    .onUpdate((event) => {
-      const maxTranslateX = width / 2 - 50;
-      const maxTranslateY = height / 2 - 50;
+  for (let i = 0; i < numShapes; i++) {
+    const translationX = useSharedValue(0);
+    const translationY = useSharedValue(0);
+    const prevTranslationX = useSharedValue(0);
+    const prevTranslationY = useSharedValue(0);
+    const scale = useSharedValue(1);
+    const startScale = useSharedValue(1);
+    const angle = useSharedValue(0);
+    const startAngle = useSharedValue(0);
 
-      translationX.value = clamp(
-        prevTranslationX.value + event.translationX,
-        -maxTranslateX,
-        maxTranslateX
-      );
-      translationY.value = clamp(
-        prevTranslationY.value + event.translationY,
-        -maxTranslateY,
-        maxTranslateY
-      );
-    })
-    .runOnJS(true);
-
-  const pinch = Gesture.Pinch()
-    .onStart(() => {
-      startScale.value = scale.value;
-    })
-    .onUpdate((event) => {
-      scale.value = clamp(
-        startScale.value * event.scale,
-        0.5,
-        Math.min(width / 100, height / 100)
-      );
-    })
-    .runOnJS(true);
-
-  const angle = useSharedValue(0);
-  const startAngle = useSharedValue(0);
-
-  const rotation = Gesture.Rotation()
-    .onStart(() => {
-      startAngle.value = angle.value;
-    })
-    .onUpdate((event) => {
-      angle.value = startAngle.value + event.rotation;
+    shapes.push({
+      translationX,
+      translationY,
+      prevTranslationX,
+      prevTranslationY,
+      scale,
+      startScale,
+      angle,
+      startAngle,
     });
+  }
 
-  const boxAnimatedStyles = useAnimatedStyle(() => ({
-    transform: [{ rotate: `${angle.value}rad` }],
-  }));
+  const pans = shapes.map((shape) => {
+    return Gesture.Pan()
+      .minDistance(1)
+      .onStart(() => {
+        shape.prevTranslationX.value = shape.translationX.value;
+        shape.prevTranslationY.value = shape.translationY.value;
+      })
+      .onUpdate((event) => {
+        const maxTranslateX = width / 2 - 50;
+        const maxTranslateY = height / 2 - 50;
+        shape.translationX.value = clamp(
+          shape.prevTranslationX.value + event.translationX,
+          -maxTranslateX,
+          maxTranslateX
+        );
+        shape.translationY.value = clamp(
+          shape.prevTranslationY.value + event.translationY,
+          -maxTranslateY,
+          maxTranslateY
+        );
+      })
+      .runOnJS(true);
+  });
+
+  const pinches = shapes.map((shape) => {
+    return Gesture.Pinch()
+      .onStart(() => {
+        shape.startScale.value = shape.scale.value;
+      })
+      .onUpdate((event) => {
+        shape.scale.value = clamp(
+          shape.startScale.value * event.scale,
+          0.5,
+          Math.min(width / 100, height / 100)
+        );
+      })
+      .runOnJS(true);
+  });
+
+  const rotations = shapes.map((shape) => {
+    return Gesture.Rotation()
+      .onStart(() => {
+        shape.startAngle.value = shape.angle.value;
+      })
+      .onUpdate((event) => {
+        shape.angle.value = shape.startAngle.value + event.rotation;
+      })
+      .runOnJS(true);
+  });
+
+  const animatedStyles = shapes.map((shape) => {
+    return useAnimatedStyle(() => ({
+      transform: [
+        { translateX: shape.translationX.value },
+        { translateY: shape.translationY.value },
+        { scale: shape.scale.value },
+        { rotate: `${shape.angle.value}rad` },
+      ],
+    }));
+  });
 
   const handleSelectedShape = (shape: string) => {
-    setSelectedShape(shape);
     setSelectedShapeContainer((prevState) => [...prevState, shape]);
   };
 
@@ -104,26 +120,24 @@ export default function App() {
     <SafeAreaView style={styles.safeArea}>
       <GestureHandlerRootView style={styles.container}>
         <GridCanvas />
-
         {selectedShapeContainer.map((shape, index) => (
           <GestureDetector
             key={index}
-            gesture={Gesture.Simultaneous(!resizable ? pan : pinch, rotation)}
+            gesture={Gesture.Simultaneous(
+              resizable ? pinches[index] : pans[index],
+              rotations[index]
+            )}
           >
             <Animated.View
               style={[
-                animatedStyles,
-                boxAnimatedStyles,
+                animatedStyles[index],
                 styles[shape as keyof typeof styles],
                 resizable && { borderColor: "blue" },
               ]}
-            >
-              <TouchableWithoutFeedback></TouchableWithoutFeedback>
-            </Animated.View>
+            ></Animated.View>
           </GestureDetector>
         ))}
       </GestureHandlerRootView>
-
       <View style={{ alignItems: "center", justifyContent: "center" }}>
         <Button
           title={resizable ? "Move" : "Resize"}
@@ -131,14 +145,13 @@ export default function App() {
           style={{ fontSize: 20 }}
         />
       </View>
-
+      ~
       <View style={styles.ShapeContainer}>
-        {!shapeContainerVisible ? (
-          <Button
-            onPress={() => setShapeContainerVisible(true)}
-            title={"Open Shapes"}
-          />
-        ) : (
+        <Button
+          onPress={() => setShapeContainerVisible(!shapeContainerVisible)}
+          title={shapeContainerVisible ? "Close Shapes" : "Open Shapes"}
+        />
+        {shapeContainerVisible && (
           <ShapeContainer handleSelectedShape={handleSelectedShape} />
         )}
       </View>
@@ -183,5 +196,12 @@ const styles = StyleSheet.create({
     borderColor: "black",
     flexDirection: "row",
     justifyContent: "space-evenly",
+  },
+  oval: {
+    width: 150,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 2,
+    borderColor: "#000",
   },
 });

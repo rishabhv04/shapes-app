@@ -1,7 +1,6 @@
 import React from "react";
 import { TouchableOpacity, StyleSheet } from "react-native";
 
-// Define the type for valid shape names
 type Shape = "circle" | "square" | "rectangle";
 
 interface ShapeContainerProps {

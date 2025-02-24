@@ -1,67 +1,136 @@
-import React, { useRef, useEffect } from "react";
-import { View, StyleSheet, Dimensions } from "react-native";
-import Canvas from "react-native-canvas";
-const { width: WIDTH, height: HEIGHT } = Dimensions.get("window");
-const GridCanvas = () => {
-  const canvasRef = useRef(null);
+import React, { useState } from "react";
+import {
+  View,
+  Animated,
+  PanResponder,
+  StyleSheet,
+  SafeAreaView,
+} from "react-native";
 
-  useEffect(() => {
-    const drawGrid = (canvas: any) => {
-      if (canvas) {
-        const ctx = canvas.getContext("2d");
+export default function App() {
+  const [rect, setRect] = useState({
+    x: 0,
+    y: 0,
+    width: 200,
+    height: 150,
+  });
 
-        canvas.width = WIDTH;
-        canvas.height = HEIGHT;
-
-        const width = canvas.width;
-        const height = canvas.height;
-        const gridSize = 20;
-
-        ctx.fillStyle = "white";
-        ctx.fillRect(0, 0, width, height);
-
-        ctx.strokeStyle = "lightgray";
-        ctx.lineWidth = 1;
-
-        for (let x = 0; x <= width; x += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(x, 0);
-          ctx.lineTo(x, height);
-          ctx.stroke();
+  const createPanResponder = (corner: any) => {
+    return PanResponder.create({
+      onStartShouldSetPanResponder: () => true,
+      onMoveShouldSetPanResponder: () => true,
+      onPanResponderMove: (_, gestureState) => {
+        if (corner === "topLeft") {
+          const newWidth = rect.width - gestureState.dx;
+          const newHeight = rect.height - gestureState.dy;
+          if (newWidth > 0 && newHeight > 0) {
+            setRect({
+              x: rect.x + gestureState.dx,
+              y: rect.y + gestureState.dy,
+              width: newWidth,
+              height: newHeight,
+            });
+          }
+        } else if (corner === "topRight") {
+          const newWidth = rect.width + gestureState.dx;
+          const newHeight = rect.height - gestureState.dy;
+          if (newWidth > 0 && newHeight > 0) {
+            setRect({
+              x: rect.x,
+              y: rect.y + gestureState.dy,
+              width: newWidth,
+              height: newHeight,
+            });
+          }
+        } else if (corner === "bottomLeft") {
+          const newWidth = rect.width - gestureState.dx;
+          const newHeight = rect.height + gestureState.dy;
+          if (newWidth > 0 && newHeight > 0) {
+            setRect({
+              x: rect.x + gestureState.dx,
+              y: rect.y,
+              width: newWidth,
+              height: newHeight,
+            });
+          }
+        } else if (corner === "bottomRight") {
+          const newWidth = rect.width + gestureState.dx;
+          const newHeight = rect.height + gestureState.dy;
+          if (newWidth > 0 && newHeight > 0) {
+            setRect({
+              x: rect.x,
+              y: rect.y,
+              width: newWidth,
+              height: newHeight,
+            });
+          }
         }
-
-        for (let y = 0; y <= height; y += gridSize) {
-          ctx.beginPath();
-          ctx.moveTo(0, y);
-          ctx.lineTo(width, y);
-          ctx.stroke();
-        }
-      }
-    };
-
-    if (canvasRef.current) {
-      const canvas = canvasRef.current;
-      drawGrid(canvas);
-    }
-  }, []);
+      },
+    });
+  };
 
   return (
-    <View style={styles.container}>
-      <Canvas ref={canvasRef} style={styles.canvas} />
-    </View>
+    <SafeAreaView style={styles.container}>
+      <View
+        style={[
+          styles.rectangle,
+          { left: rect.x, top: rect.y, width: rect.width, height: rect.height },
+        ]}
+      >
+        {/* Top Left Corner */}
+        <Animated.View
+          {...createPanResponder("topLeft").panHandlers}
+          style={[styles.corner, { left: rect.x - 10, top: rect.y - 10 }]} // Adjusted for corner
+        />
+
+        {/* Top Right Corner */}
+        <Animated.View
+          {...createPanResponder("topRight").panHandlers}
+          style={[
+            styles.corner,
+            { left: rect.x + rect.width - 10, top: rect.y - 10 },
+          ]} // Adjusted for corner
+        />
+
+        {/* Bottom Left Corner */}
+        <Animated.View
+          {...createPanResponder("bottomLeft").panHandlers}
+          style={[
+            styles.corner,
+            { left: rect.x - 10, top: rect.y + rect.height - 10 },
+          ]} // Adjusted for corner
+        />
+
+        {/* Bottom Right Corner */}
+        <Animated.View
+          {...createPanResponder("bottomRight").panHandlers}
+          style={[
+            styles.corner,
+            { left: rect.x + rect.width - 10, top: rect.y + rect.height - 10 },
+          ]} // Adjusted for corner
+        />
+      </View>
+    </SafeAreaView>
   );
-};
+}
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f5f5f5",
   },
-  canvas: {
-    borderWidth: 1,
-    borderColor: "#000",
+  rectangle: {
+    position: "absolute",
+    borderWidth: 2,
+    borderColor: "blue",
+  },
+  corner: {
+    position: "absolute",
+    width: 20,
+    height: 20,
+    backgroundColor: "red",
+    borderRadius: 10,
   },
 });
-
-export default GridCanvas;
